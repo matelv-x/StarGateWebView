@@ -40,6 +40,10 @@ Screenshots supplied by the author.
 
 ![Stargate symbol overview and desktop window menu](docs/images/symbols-and-menu.png)
 
+| Move window | Resize window |
+| --- | --- |
+| ![Move window](docs/images/move-window.png) | ![Resize window](docs/images/resize-window.png) |
+
 The displayed web interface belongs to the connected Stargate server and is not included in this application.
 
 ## Uninstall and stored data
