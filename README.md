@@ -15,6 +15,13 @@ A Windows desktop viewer for Stargate web interfaces, built with C# WinForms and
 - Updating an existing installation preserves settings and removes the previous application files after a successful replacement.
 - Uninstall entry in Windows Settings, including the application icon.
 
+## Window controls
+
+- **Top-left corner:** hold the left mouse button and drag to move the window around the desktop.
+- **Bottom-right corner:** hold the left mouse button and drag to resize the window.
+- **Bottom-left corner:** click to open the application menu.
+- **F11:** toggle fullscreen. **F5:** refresh the page.
+
 ## Installation and updates
 
 1. Download `StarGateSetup-x64.exe` from Releases.
