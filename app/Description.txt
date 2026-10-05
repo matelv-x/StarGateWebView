@@ -1,0 +1,24 @@
+Quick Start
+
+StarGateLauncher.exe is a portable application that opens a frameless web window on the Windows desktop.
+
+Basic usage:
+1. Run StarGateLauncher.exe.
+2. Choose how to connect:
+   - stargate.local, or
+   - enter an IP address.
+3. The selected page will open in a frameless window.
+
+Window controls:
+- Top-left corner -> move the window
+- Bottom-right corner -> resize the window
+- Bottom-left corner -> menu
+
+Keyboard shortcuts:
+- F5 -> Refresh
+- F11 -> toggle fullscreen
+- Esc -> exit fullscreen
+- Alt + F4 -> close program
+- Ctrl + Alt + F11 -> alternate fullscreen toggle (if F11 is blocked)
+
+Auto Start and a desktop shortcut are available during extraction. ________________________________________

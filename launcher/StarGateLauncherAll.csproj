@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <ApplicationIcon>window.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="stargate.ico" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
+    <None Include="ReadMe.txt" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
+    <None Include="Description.txt" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
+	<None Condition="'$(IncludeRuntimeInstallers)' == 'true'" Include="redist\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Uninstall.ps1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="launcher-package.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="app-x64\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Form1.cs;Form1.Designer.cs;InstallLocationDialog.cs;Setup\**\*.cs" />
+    <EmbeddedResource Remove="Form1.resx;InstallLocationDialog.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="window.ico" />
+  </ItemGroup>
+
+  <ItemGroup><None Remove="app-x64\WebView2\**\*" /><Content Remove="app-x64\WebView2\**\*" /><None Update="redist\MicrosoftEdgeWebview2Setup.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
+  <ItemGroup Condition="'$(AppPayloadDirectory)' != ''">
+    <None Remove="app-x64\**\*" />
+    <None Include="$(AppPayloadDirectory)\**\*" Link="app-x64\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup></Project>

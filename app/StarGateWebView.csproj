@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0-windows</TargetFramework>
+		<UseWindowsForms>true</UseWindowsForms>
+		<OutputType>WinExe</OutputType>
+		<PlatformTarget>x64</PlatformTarget>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<Platforms>AnyCPU;x64</Platforms>
+		<Prefer32Bit>false</Prefer32Bit>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<ApplicationIcon>stargate.ico</ApplicationIcon>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3800.47" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Reference Remove="Microsoft.Web.WebView2.Wpf" />
+		<Reference Remove="Microsoft.Web.WebView2.Wpf.dll" />
+	</ItemGroup>
+
+	<!-- Copy icon next to EXE for your runtime-loading code + publish -->
+	<ItemGroup>
+		<None Include="stargate.ico">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</None>
+	</ItemGroup>
+
+
+	<!-- Copy ReadMe.txt next to EXE for your runtime-loading code + publish -->
+	<ItemGroup>
+		<None Include="ReadMe.txt">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</None>
+	</ItemGroup>
+
+	<!-- Copy Description.txt next to EXE for your runtime-loading code + publish -->
+	<ItemGroup>
+	  <None Update="Description.txt">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
+	  <None Update="PL, FR, EN Note_V3.txt">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
+
+  <ItemGroup><None Remove="WebView2\**\*" /><Content Remove="WebView2\**\*" /></ItemGroup>
+</Project>

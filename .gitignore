@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/.vs/
+**/app-x64/
+**/WebView2/
+**/WebView2UserData/
+**/redist/*.exe
+*.user
+*.suo
+*.pdb
+*.backup*
+config.json
+launcher.json
+*.log
+.env
