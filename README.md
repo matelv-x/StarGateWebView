@@ -9,7 +9,6 @@ A Windows desktop viewer for Stargate web interfaces, built with C# WinForms and
 - Frameless desktop window, dragging and resizing from the corners.
 - F11 fullscreen toggle and F5 page refresh.
 - Saved connection profiles and window position/size.
-- FAN113 scene fitting with a compact status bar for small windows.
 - WebView2 Evergreen: the browser engine is maintained separately by Microsoft.
 - Single EXE installer with extraction progress, automatic detection/installation of missing Evergreen, desktop shortcut and optional startup at Windows login.
 - Updating an existing installation preserves settings and removes the previous application files after a successful replacement.
