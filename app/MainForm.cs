@@ -9,6 +9,7 @@ namespace StarGateWebView
     public partial class MainForm : Form
     {
         private readonly WebView2 webView = new WebView2();
+        private UniversalWebViewFit.FitToWindow? fitToWindow;
 
         // Hotspots (TRANSPARENT)
         private readonly TransparentPanel dragCorner = new TransparentPanel();   // TOP-LEFT (drag)
@@ -523,6 +524,7 @@ namespace StarGateWebView
             menu.Items.Add(isFullscreen ? "Exit fullscreen (Esc)" : "Open fullscreen (F11)",
                 null, (_, __) => ToggleFullscreen());
 
+            AddScalingMenu(menu);
             menu.Items.Add("Save window position/size", null, (_, __) => SaveWindowPlacement());
 
             menu.Items.Add("Reset to defaults (this session)", null, (_, __) =>
@@ -534,6 +536,7 @@ namespace StarGateWebView
 
                 if (isFullscreen) ToggleFullscreen();
                 DeleteConfigSafe();
+                if (fitToWindow != null) fitToWindow.FitEntirePage = false;
                 EnsureConfigFileExists();
                 ApplyDefaultWindowPlacement();
 
@@ -564,6 +567,28 @@ namespace StarGateWebView
 
             var screenPoint = menuCorner.PointToScreen(new Point(0, 0));
             menu.Show(screenPoint.X, screenPoint.Y - menu.Height);
+        }
+
+        private void AddScalingMenu(ContextMenuStrip menu)
+        {
+            bool entirePage = fitToWindow?.FitEntirePage ?? LoadConfigSafe().FitEntirePage;
+            var scaling = new ToolStripMenuItem("Page scaling") { ForeColor = MENU_FG };
+            void AddMode(string label, bool entire)
+            {
+                var item = new ToolStripMenuItem(label) { Checked = entirePage == entire, ForeColor = MENU_FG };
+                item.Click += (_, _) =>
+                {
+                    var cfg = LoadConfigSafe();
+                    cfg.FitEntirePage = entire;
+                    SaveConfigSafe(cfg);
+                    if (fitToWindow != null) fitToWindow.FitEntirePage = entire;
+                    menu.Close();
+                };
+                scaling.DropDownItems.Add(item);
+            }
+            AddMode("Fit width (vertical scrolling)", false);
+            AddMode("Fit entire page", true);
+            menu.Items.Add(scaling);
         }
 
         private ToolStripDropDown CreateLegendPopup(float uiScale)
@@ -822,6 +847,7 @@ Keyboard shortcuts:
 
                 Activate();
             }
+            fitToWindow?.Schedule();
         }
 
         private static class NativeHotKey
@@ -865,6 +891,7 @@ Keyboard shortcuts:
             public int? LastPort { get; set; }
             public string LastMode { get; set; } = "LocalDial9";
             public bool SetupCompleted { get; set; }
+            public bool FitEntirePage { get; set; }
             public int? WindowX { get; set; }
             public int? WindowY { get; set; }
             public int? WindowW { get; set; }
@@ -947,117 +974,6 @@ Keyboard shortcuts:
 
         private bool WebViewUnavailable => IsDisposed || Disposing || webView.IsDisposed || webView.Disposing;
 
-        private static bool IsFan113Uri(Uri? uri) =>
-            uri != null && uri.IsAbsoluteUri &&
-            uri.AbsolutePath.EndsWith("/fan113.html", StringComparison.OrdinalIgnoreCase);
-
-        // Restrict presentation changes to the top-level FAN113 document.
-        private const string Fan113TouchScript = """
-            (() => {
-                if (window !== window.top || !location.pathname.toLowerCase().endsWith('/fan113.html')) return;
-                const apply = () => {
-                    if (document.getElementById('native-fan113-touch-style')) return;
-                    const style = document.createElement('style');
-                    style.id = 'native-fan113-touch-style';
-                    style.textContent = '*,*::before,*::after{-webkit-tap-highlight-color:transparent!important;}' +
-                        ':focus:not(:focus-visible){outline:none!important;box-shadow:none!important;}';
-                    (document.head || document.documentElement).appendChild(style);
-                };
-                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply, {once:true});
-                else apply();
-            })();
-            """;
-
-        // FAN113's desktop cover/min-height rules crop short windows.
-        // Fit its existing composition once, leaving WebView native zoom at 100%.
-        private const string Fan113FitScript = """
-            (() => {
-                if (window !== window.top || !location.pathname.toLowerCase().endsWith('/fan113.html')) return;
-                const install = () => {
-                    const world = document.querySelector('.world');
-                    const composition = document.querySelector('#scene-composition');
-                    const status = document.querySelector('.status-bar');
-                    if (!world || !composition || !status) return;
-                    const style = document.createElement('style');
-                    style.id = 'native-fan113-fit-style';
-                    style.textContent = `
-                        .world{min-height:0!important;}
-                        .status-bar{background:transparent!important;border-color:transparent!important;
-                            box-shadow:none!important;backdrop-filter:none!important;}
-                        .status-bar>.status-place,.status-bar>.status-state,.status-bar>.status-actions{
-                            border-color:transparent!important;}
-                        .status-place,.status-state{ text-shadow:0 1px 3px #000,0 0 6px #000; }
-                        @media(max-width:900px),(max-height:600px){
-                            .status-bar{left:7px!important;right:7px!important;bottom:7px!important;
-                                min-height:0!important;grid-template-columns:minmax(70px,1fr) auto auto!important;}
-                            .status-bar>*{box-sizing:border-box;min-height:0!important;padding:5px 7px!important;}
-                            .status-place .eyebrow{font-size:7px!important;}
-                            #gate-name{font-size:11px!important;margin-top:1px!important;}
-                            .status-state{display:flex!important;gap:5px!important;font-size:9px!important;
-                                flex-wrap:wrap;letter-spacing:.04em!important;}
-                            .status-lamp{width:6px!important;height:6px!important;}
-                            .status-actions{gap:6px!important;justify-content:flex-end!important;}
-                            .status-actions button{min-height:28px!important;padding:0 7px!important;
-                                font-size:8px!important;letter-spacing:.02em!important;}
-                            #iris-control{box-sizing:border-box;display:flex!important;align-items:center;
-                                gap:5px;min-width:0!important;min-height:28px;padding:0!important;
-                                font-size:10px!important;white-space:nowrap;}
-                            #iris-audio-switch{position:static!important;transform:none!important;
-                                display:inline-flex;align-items:center;min-height:18px!important;
-                                padding:0 5px!important;font-size:6px!important;white-space:nowrap;}
-                        }
-                        @media(max-width:420px){
-                            .status-bar{grid-template-columns:minmax(0,1fr) auto!important;}
-                            .status-place,.status-state{padding:3px 7px!important;}
-                            .status-state{border-right:0!important;}
-                            .status-actions{grid-column:1/-1;padding:3px 7px!important;
-                                border-top:1px solid rgba(157,171,161,.14);}
-                            .status-actions button,#iris-control{min-height:24px!important;}
-                        }
-                    `;
-                    document.head.appendChild(style);
-                    let pending = false;
-                    const fit = () => {
-                        pending = false;
-                        const w = world.clientWidth, h = world.clientHeight;
-                        const cw = composition.offsetWidth, ch = composition.offsetHeight;
-                        if (!w || !h || !cw || !ch) return;
-                        const bottom = Math.max(0, parseFloat(getComputedStyle(status).bottom) || 0);
-                        const gap = 12;
-                        const availableHeight = Math.max(1, h - status.offsetHeight - bottom - gap * 2);
-                        const scale = Math.max(0.0001, Math.min(Math.max(1, w - gap * 2) / cw, availableHeight / ch));
-                        const set = (name, value) => {
-                            if (composition.style.getPropertyValue(name) !== value ||
-                                composition.style.getPropertyPriority(name) !== 'important')
-                                composition.style.setProperty(name, value, 'important');
-                        };
-                        set('--scene-responsive-scale', String(scale));
-                        set('top', String(gap + availableHeight / 2) + 'px');
-                        composition.dataset.responsiveMode = 'native-contain';
-                        composition.dataset.responsiveScale = scale.toFixed(6);
-                    };
-                    const schedule = () => {
-                        if (!pending) { pending = true; queueMicrotask(fit); }
-                    };
-                    new ResizeObserver(schedule).observe(world);
-                    new ResizeObserver(schedule).observe(status);
-                    new MutationObserver(schedule).observe(composition, {attributes:true, attributeFilter:['style']});
-                    window.addEventListener('resize', schedule, {passive:true});
-                    fit();
-                };
-                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true});
-                else install();
-            })();
-            """;
-
-        private void ApplyFan113NavigationSettings(Uri? uri)
-        {
-            if (WebViewUnavailable || webView.CoreWebView2 == null) return;
-            bool fan113 = IsFan113Uri(uri);
-            webView.CoreWebView2.Settings.IsZoomControlEnabled = !fan113;
-            if (fan113) webView.ZoomFactor = 1.0;
-        }
-
         private static void WriteDiagnosticSafe(string path, string text, bool append = false)
         {
             try
@@ -1095,23 +1011,19 @@ Keyboard shortcuts:
                 settings.IsStatusBarEnabled = false;
                 settings.AreDefaultContextMenusEnabled = false;
 
-                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(Fan113TouchScript);
-                if (WebViewUnavailable) return;
-                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(Fan113FitScript);
-                if (WebViewUnavailable) return;
-
-                webView.CoreWebView2.NavigationStarting += (_, e) =>
+                fitToWindow?.Dispose();
+                fitToWindow = new UniversalWebViewFit.FitToWindow(webView) { FitEntirePage = LoadConfigSafe().FitEntirePage };
+                webView.CoreWebView2.NavigationStarting += (_, _) =>
                 {
-                    if (Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri))
-                        ApplyFan113NavigationSettings(uri);
+                    if (fitToWindow != null) fitToWindow.FitEntirePage = LoadConfigSafe().FitEntirePage;
                 };
-                ApplyFan113NavigationSettings(targetUri);
+                Disposed += (_, _) => fitToWindow?.Dispose();
 
                 // Log navigation results to file
                 webView.CoreWebView2.NavigationCompleted += (_, e) =>
                 {
                     if (WebViewUnavailable) return;
-                    ApplyFan113NavigationSettings(webView.Source);
+
                     string msg = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} | " +
                                  $"Success: {e.IsSuccess} | " +
                                  $"Status: {e.WebErrorStatus} | " +
@@ -1140,7 +1052,7 @@ Keyboard shortcuts:
         // STARTUP DIALOG
         // ──────────────────────────────────────────────
 
-        private static Uri BuildStartupAddress(string address, int? port, string fallbackPath)
+        private static Uri BuildStartupAddress(string address, int? port)
         {
             string input = address.Trim();
             if (!input.Contains("://"))
@@ -1150,7 +1062,7 @@ Keyboard shortcuts:
             if (builder.Scheme != Uri.UriSchemeHttp && builder.Scheme != Uri.UriSchemeHttps)
                 throw new UriFormatException("Use an HTTP or HTTPS address.");
             if (port.HasValue) builder.Port = port.Value;
-            if (string.IsNullOrEmpty(builder.Path) || builder.Path == "/") builder.Path = fallbackPath;
+
             return builder.Uri;
         }
         private Uri? ShowStartupChoiceAndGetUri()
@@ -1163,8 +1075,8 @@ Keyboard shortcuts:
                 {
                     case StartupDialog.Mode.LocalDial9: return new Uri($"http://{DefaultHost}{PathDial9}");
                     case StartupDialog.Mode.LocalDial: return new Uri($"http://{DefaultHost}{PathDial}");
-                    case StartupDialog.Mode.IpDial9: return BuildStartupAddress(cfg.LastIpOrHost, cfg.LastPort, PathDial9);
-                    case StartupDialog.Mode.IpDial: return BuildStartupAddress(cfg.LastIpOrHost, cfg.LastPort, PathDial);
+                    case StartupDialog.Mode.IpDial9: return BuildStartupAddress(cfg.LastIpOrHost, cfg.LastPort);
+                    case StartupDialog.Mode.IpDial: return BuildStartupAddress(cfg.LastIpOrHost, cfg.LastPort);
                 }
             }
 
@@ -1174,6 +1086,7 @@ Keyboard shortcuts:
             if (dlg.ResetRequested)
             {
                 DeleteConfigSafe();
+                if (fitToWindow != null) fitToWindow.FitEntirePage = false;
                 return null;
             }
 
@@ -1193,8 +1106,8 @@ Keyboard shortcuts:
             {
                 StartupDialog.Mode.LocalDial9 => new Uri($"http://{DefaultHost}{PathDial9}"),
                 StartupDialog.Mode.LocalDial => new Uri($"http://{DefaultHost}{PathDial}"),
-                StartupDialog.Mode.IpDial9 => BuildStartupAddress(dlg.IpAddress, dlg.PortValue, PathDial9),
-                StartupDialog.Mode.IpDial => BuildStartupAddress(dlg.IpAddress, dlg.PortValue, PathDial),
+                StartupDialog.Mode.IpDial9 => BuildStartupAddress(dlg.IpAddress, dlg.PortValue),
+                StartupDialog.Mode.IpDial => BuildStartupAddress(dlg.IpAddress, dlg.PortValue),
                 _ => null
             };
         }
@@ -1221,7 +1134,7 @@ Keyboard shortcuts:
             private readonly RadioButton rbLocalDial9 = new();
             private readonly RadioButton rbLocalDial = new();
             private readonly RadioButton rbIpDial9 = new();
-            private readonly RadioButton rbIpDial = new();
+
             private readonly TextBox txtIp = new();
             private readonly TextBox txtPort = new();
             private readonly CheckBox cbRemember = new();
@@ -1241,7 +1154,7 @@ Keyboard shortcuts:
                 ShowInTaskbar = false;
                 StartPosition = FormStartPosition.CenterParent;
                 AutoScaleMode = AutoScaleMode.Font;
-                ClientSize = new Size(640, 380);
+                ClientSize = new Size(640, 430);
 
                 var lbl = new Label { Text = "Choose what to open:", Location = new Point(14, 14), AutoSize = true };
                 Controls.Add(lbl);
@@ -1252,34 +1165,36 @@ Keyboard shortcuts:
                 rbLocalDial.Text = $"Open http://{DefaultHost}{PathDial}";
                 rbLocalDial.Location = new Point(18, 72); rbLocalDial.AutoSize = true;
 
-                rbIpDial9.Text = $"Open http://IP[:PORT]{PathDial9}";
+                rbIpDial9.Text = "Open an IP address, host or website URL";
                 rbIpDial9.Location = new Point(18, 114); rbIpDial9.AutoSize = true;
 
-                rbIpDial.Text = $"Open http://IP[:PORT]{PathDial}";
-                rbIpDial.Location = new Point(18, 142); rbIpDial.AutoSize = true;
 
-                Controls.AddRange(new Control[] { rbLocalDial9, rbLocalDial, rbIpDial9, rbIpDial });
+                Controls.AddRange(new Control[] { rbLocalDial9, rbLocalDial, rbIpDial9 });
 
-                var lblIp = new Label { Text = "IP address / Host:", Location = new Point(38, 190), AutoSize = true };
+                var lblIp = new Label { Text = "IP address / host / website URL:", Location = new Point(38, 160), AutoSize = true };
                 txtIp.Location = new Point(lblIp.Left, lblIp.Bottom + 6);
-                txtIp.Size = new Size(340, 23);
-                txtIp.PlaceholderText = "192.168.1.100 or stargate.local";
+                txtIp.Size = new Size(390, 23);
+                txtIp.PlaceholderText = "gate.highlandergate.com/fan113.html";
 
-                var lblPort = new Label { Text = "Port (optional):", Location = new Point(400, 190), AutoSize = true };
+                var lblPort = new Label { Text = "Port (optional):", Location = new Point(455, 160), AutoSize = true };
                 txtPort.Location = new Point(lblPort.Left, lblPort.Bottom + 6);
-                txtPort.Size = new Size(200, 23);
+                txtPort.Size = new Size(145, 23);
                 txtPort.PlaceholderText = "8080";
 
                 Controls.AddRange(new Control[] { lblIp, txtIp, lblPort, txtPort });
+                Controls.Add(new Label {
+                    Text = "You can also enter a website address, for example:\ngate.highlandergate.com/fan113.html",
+                    Location = new Point(38, 217), AutoSize = true
+                });
 
                 cbRemember.Text = "Remember selection (save to config.json)";
-                cbRemember.Location = new Point(18, 270); cbRemember.AutoSize = true;
+                cbRemember.Location = new Point(18, 290); cbRemember.AutoSize = true;
                 cbRemember.Checked = true;
                 Controls.Add(cbRemember);
 
                 btnReset.Text = "Clear saved IP/Port";
                 btnReset.Size = new Size(170, 32);
-                btnReset.Location = new Point(18, 310);
+                btnReset.Location = new Point(18, 330);
                 Controls.Add(btnReset);
 
                 btnOk.Text = "OK"; btnOk.Size = new Size(100, 32); btnOk.DialogResult = DialogResult.OK;
@@ -1292,7 +1207,7 @@ Keyboard shortcuts:
                 rbLocalDial9.CheckedChanged += (_, _) => UpdateIpFields();
                 rbLocalDial.CheckedChanged += (_, _) => UpdateIpFields();
                 rbIpDial9.CheckedChanged += (_, _) => UpdateIpFields();
-                rbIpDial.CheckedChanged += (_, _) => UpdateIpFields();
+
 
                 btnReset.Click += (_, _) =>
                 {
@@ -1306,7 +1221,7 @@ Keyboard shortcuts:
 
                 btnOk.Click += (_, _) =>
                 {
-                    if ((rbIpDial9.Checked || rbIpDial.Checked) && string.IsNullOrWhiteSpace(txtIp.Text))
+                    if (rbIpDial9.Checked && string.IsNullOrWhiteSpace(txtIp.Text))
                     {
                         MessageBox.Show("IP address is required for remote modes.",
                             "StarGate WebView", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -1326,7 +1241,7 @@ Keyboard shortcuts:
                     {
                         SelectedMode = rbLocalDial9.Checked ? Mode.LocalDial9 :
                                        rbLocalDial.Checked ? Mode.LocalDial :
-                                       rbIpDial9.Checked ? Mode.IpDial9 : Mode.IpDial;
+                                       Mode.IpDial9;
                     }
                 };
 
@@ -1346,7 +1261,7 @@ Keyboard shortcuts:
                         case Mode.LocalDial9: rbLocalDial9.Checked = true; break;
                         case Mode.LocalDial: rbLocalDial.Checked = true; break;
                         case Mode.IpDial9: rbIpDial9.Checked = true; break;
-                        case Mode.IpDial: rbIpDial.Checked = true; break;
+                        case Mode.IpDial: rbIpDial9.Checked = true; break;
                     }
                 }
                 else rbLocalDial9.Checked = true;
@@ -1364,7 +1279,7 @@ Keyboard shortcuts:
 
             private void UpdateIpFields()
             {
-                bool ipMode = rbIpDial9.Checked || rbIpDial.Checked;
+                bool ipMode = rbIpDial9.Checked;
                 txtIp.Enabled = txtPort.Enabled = ipMode;
             }
         }
