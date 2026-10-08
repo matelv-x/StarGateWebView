@@ -170,10 +170,41 @@ internal static class DesktopUpdater
         }
         return System.Text.Encoding.UTF8.GetString(output.ToArray());
     }
+    internal static string FindGitExecutable()
+    {
+        var candidates = new List<string>();
+        foreach (var hive in new[] { Microsoft.Win32.RegistryHive.CurrentUser, Microsoft.Win32.RegistryHive.LocalMachine })
+        foreach (var view in new[] { Microsoft.Win32.RegistryView.Registry64, Microsoft.Win32.RegistryView.Registry32 })
+        {
+            using var root = Microsoft.Win32.RegistryKey.OpenBaseKey(hive, view);
+            using var key = root.OpenSubKey(@"SOFTWARE\GitForWindows");
+            if (key?.GetValue("InstallPath") is string install)
+                candidates.Add(Path.Combine(install, "cmd", "git.exe"));
+        }
+        foreach (string folder in new[] { Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs") })
+            if (!string.IsNullOrEmpty(folder)) candidates.Add(Path.Combine(folder, "Git", "cmd", "git.exe"));
+        // This personal installation can also use the already installed Codex Git runtime.
+        candidates.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".cache", "codex-runtimes", "codex-primary-runtime", "dependencies", "native", "git", "cmd", "git.exe"));
+        foreach (string folder in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
+        {
+            string path = folder.Trim().Trim('"');
+            if (Path.IsPathFullyQualified(path)) candidates.Add(Path.Combine(path, "git.exe"));
+        }
+        return candidates.FirstOrDefault(File.Exists)
+            ?? throw new IOException("Git for Windows was not found. Install Git with Git Credential Manager and sign in to GitHub before updating this private application.");
+    }
     internal static async Task<string> ReadGitCredentialAsync(CancellationToken cancellation)
     {
-        var info = new ProcessStartInfo("git", "credential fill") { UseShellExecute = false, CreateNoWindow = true,
+        string git = FindGitExecutable();
+        var info = new ProcessStartInfo(git, "credential fill") { UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        string gitRoot = Path.GetDirectoryName(Path.GetDirectoryName(git))!;
+        info.Environment["PATH"] = string.Join(Path.PathSeparator,
+            Path.GetDirectoryName(git), Path.Combine(gitRoot, "mingw64", "bin"),
+            Environment.GetFolderPath(Environment.SpecialFolder.System), Environment.GetEnvironmentVariable("PATH") ?? "");
         info.Environment["GIT_TERMINAL_PROMPT"] = "0"; info.Environment["GCM_INTERACTIVE"] = "never";
         using var process = Process.Start(info) ?? throw new IOException("Could not start Git Credential Manager.");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation); timeout.CancelAfter(TimeSpan.FromSeconds(15));
