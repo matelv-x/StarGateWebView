@@ -455,6 +455,21 @@ namespace StarGateWebView
         // CONTEXT MENU
         // ──────────────────────────────────────────────
 
+        private static Rectangle IncludeVisibleSubmenus(ToolStripDropDown menu, Rectangle safe)
+        {
+            foreach (ToolStripItem item in menu.Items)
+            {
+                if (item is ToolStripMenuItem mi && mi.HasDropDownItems && mi.DropDown.Visible)
+                {
+                    var bounds = mi.DropDown.Bounds;
+                    bounds.Inflate(10, 10);
+                    safe = Rectangle.Union(safe, bounds);
+                    safe = IncludeVisibleSubmenus(mi.DropDown, safe);
+                }
+            }
+            return safe;
+        }
+
         private void ShowMenu()
         {
             float ui = GetUiScale();
@@ -490,9 +505,7 @@ namespace StarGateWebView
 
                 try
                 {
-                    var sel = (menu as ToolStripDropDown)?.GetItemAt(menu.PointToClient(cursor));
-                    if (sel is ToolStripMenuItem mi && mi.DropDown?.Visible == true)
-                        safe = Rectangle.Union(safe, mi.DropDown.Bounds);
+                    safe = IncludeVisibleSubmenus(menu, safe);
                 }
                 catch { }
 
