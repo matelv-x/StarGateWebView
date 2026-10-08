@@ -576,6 +576,11 @@ namespace StarGateWebView
             menu.Items.Add(legendItem);
 
             menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Check for updates...", null, async (_, __) =>
+            {
+                menu.Close();
+                await DesktopUpdates.DesktopUpdater.CheckAsync(this, "StarGateWebView");
+            });
             menu.Items.Add("Exit", null, (_, __) => Close());
 
             var screenPoint = menuCorner.PointToScreen(new Point(0, 0));

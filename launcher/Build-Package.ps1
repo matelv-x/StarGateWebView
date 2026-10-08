@@ -17,6 +17,7 @@ try {
     $payload = Join-Path $stage 'app-x64'
     dotnet publish $source -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false -o $payload
     if ($LASTEXITCODE -ne 0) { throw 'Application build failed.' }
+    $applicationHash = (Get-FileHash -LiteralPath (Join-Path $payload 'StarGateWebView.dll')).Hash.ToLowerInvariant()
     if (Test-Path -LiteralPath (Join-Path $payload 'WebView2')) { throw 'Unexpected fixed runtime in Evergreen payload.' }
     $package = Join-Path $stage 'package'
     dotnet publish (Join-Path $PSScriptRoot 'StarGateLauncherAll.csproj') -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false "-p:AppPayloadDirectory=$payload" -o $package
@@ -34,3 +35,13 @@ try {
     Remove-Item -LiteralPath $stage -Recurse -Force
 }
 Write-Output ('Installer: '+(Join-Path $OutputDirectory 'StarGateSetup.exe'))
+
+$installer = Join-Path $OutputDirectory 'StarGateSetup.exe'
+$update = @{
+    Schema = 1; Application = 'StarGateWebView'; Architecture = 'x64'
+    Build = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss')
+    ApplicationSha256 = $applicationHash
+    InstallerSha256 = (Get-FileHash -LiteralPath $installer).Hash.ToLowerInvariant()
+    InstallerSize = (Get-Item -LiteralPath $installer).Length
+}
+[IO.File]::WriteAllText((Join-Path $OutputDirectory 'StarGateWebView-update.json'), ($update | ConvertTo-Json), [Text.UTF8Encoding]::new($false))

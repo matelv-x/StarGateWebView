@@ -27,7 +27,7 @@ A Windows desktop viewer for Stargate web interfaces, built with C# WinForms and
 2. Run it and choose your installation name, shortcuts and destination folder.
 3. Open the application and choose your Stargate server or web address.
 
-The installer includes .NET 8. If WebView2 Evergreen is missing, the Microsoft bootstrapper installs it; internet access is required for this step. When Evergreen is already present, this installation step is skipped. Application updates are installed by downloading and running the newer installer; this application does not automatically download new application releases.
+The installer includes .NET 8. If WebView2 Evergreen is missing, the Microsoft bootstrapper installs it; internet access is required for this step. When Evergreen is already present, this installation step is skipped. Choose **Check for updates...** in the application menu to download and verify the latest installer, then confirm installation. Saved settings are retained. Updates run only when requested.
 
 This release is Windows x64. Native ARM64 binaries are not included in this release.
 
@@ -70,3 +70,7 @@ dotnet build app/StarGateWebView.csproj -c Release
 ## License
 
 See [LICENSE](LICENSE) for the existing personal/educational, non-commercial use and redistribution terms. Stargate names and the displayed server artwork belong to their respective owners.
+
+## Publishing an application update
+
+Build with launcher/Build-Package.ps1, then upload the generated installer, StarGateWebView-update.json and SHA256SUMS.txt together to the existing GitHub release. The manifest identifies the application DLL and installer by SHA-256, so replacing an asset under the same version is detected. launcher/Publish-Update.ps1 performs verified asset replacement in the existing release using the publisher's Git credentials; no new release is created.
