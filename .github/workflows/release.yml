@@ -1,0 +1,61 @@
+name: Publish Windows release
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/release.yml]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag
+        required: true
+        default: v1.0.1
+permissions:
+  contents: write
+concurrency:
+  group: publish-windows-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || 'v1.0.1' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build and verify update package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./launcher/Build-Package.ps1 -OutputDirectory "${{ runner.temp }}/installer"
+          $directory = "${{ runner.temp }}/installer"
+          Rename-Item -LiteralPath "$directory/StarGateSetup.exe" -NewName StarGateSetup-x64.exe
+          $installer = "$directory/StarGateSetup-x64.exe"
+          $manifest = Get-Content -LiteralPath "$directory/StarGateWebView-update.json" -Raw | ConvertFrom-Json
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($manifest.Application -ne 'StarGateWebView' -or $manifest.Architecture -ne 'x64' -or
+              $manifest.InstallerSha256 -ne $hash -or $manifest.InstallerSize -ne (Get-Item -LiteralPath $installer).Length) {
+            throw 'Update manifest does not match installer.'
+          }
+          [IO.File]::WriteAllText("$directory/SHA256SUMS.txt", "$hash  StarGateSetup-x64.exe" + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
+      - name: Publish installer and update manifest
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $directory = "${{ runner.temp }}/installer"
+          $notes = @"
+          Adds **Change address...** to the window menu. Choose a new server or website without restarting the application.
+          
+          Keep **Remember selection** checked to open the new address on the next launch. Cancel leaves the current page unchanged.
+          
+          Includes HTTP/HTTPS address validation. Download StarGateSetup-x64.exe or use Check for updates in the application. Saved settings are preserved.
+          "@
+          $notesPath = "${{ runner.temp }}/release-notes.md"
+          [IO.File]::WriteAllText($notesPath, $notes, [Text.UTF8Encoding]::new($false))
+          gh release create $env:RELEASE_TAG "$directory/StarGateSetup-x64.exe" "$directory/StarGateWebView-update.json" "$directory/SHA256SUMS.txt" --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "$env:RELEASE_TAG — Change address" --notes-file $notesPath --draft
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed.' }
+          gh release edit $env:RELEASE_TAG --repo "${{ github.repository }}" --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
