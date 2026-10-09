@@ -527,6 +527,17 @@ namespace StarGateWebView
                 else webView.Reload();
             });
 
+            menu.Items.Add("Change address...", null, (_, __) =>
+            {
+                menu.Close();
+                var uri = ShowStartupChoiceAndGetUri(forceSelection: true);
+                if (uri == null || WebViewUnavailable) return;
+
+                startUri = uri;
+                if (webView.CoreWebView2 != null) webView.CoreWebView2.Navigate(uri.ToString());
+                else webView.Source = uri;
+            });
+
             menu.Items.Add("Open config folder", null, (_, __) =>
             {
                 var folder = Path.GetDirectoryName(ConfigPath)!;
@@ -1083,11 +1094,11 @@ Keyboard shortcuts:
 
             return builder.Uri;
         }
-        private Uri? ShowStartupChoiceAndGetUri()
+        private Uri? ShowStartupChoiceAndGetUri(bool forceSelection = false)
         {
             var cfg = LoadConfigSafe();
 
-            if (cfg.SetupCompleted && Enum.TryParse<StartupDialog.Mode>(cfg.LastMode, out var m))
+            if (!forceSelection && cfg.SetupCompleted && Enum.TryParse<StartupDialog.Mode>(cfg.LastMode, out var m))
             {
                 switch (m)
                 {
@@ -1250,6 +1261,16 @@ Keyboard shortcuts:
                         MessageBox.Show("Port must be between 1–65535 or left empty.",
                             "StarGate WebView", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         DialogResult = DialogResult.None;
+                    }
+                    else if (rbIpDial9.Checked)
+                    {
+                        try { BuildStartupAddress(txtIp.Text, PortValue); }
+                        catch (UriFormatException)
+                        {
+                            MessageBox.Show("Enter a valid HTTP or HTTPS address.",
+                                "StarGate WebView", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            DialogResult = DialogResult.None;
+                        }
                     }
                 };
 
